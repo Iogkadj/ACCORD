@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Boeing 737 MAX Coordinate Viewer</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            
+            body {
+                font-family: 'Arial', sans-serif;
+                background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+                color: #fff;
+                overflow: hidden;
+            }
+            
+            .container {
+                display: flex;
+                height: 100vh;
+            }
+            
+            .sidebar {
+                width: 350px;
+                background: rgba(0, 0, 0, 0.8);
+                padding: 20px;
+                overflow-y: auto;
+                border-right: 2px solid #4a90e2;
+            }
+            
+            .main-content {
+                flex: 1;
+                position: relative;
+            }
+            
+            h1 {
+                font-size: 24px;
+                margin-bottom: 20px;
+                color: #4a90e2;
+                text-align: center;
+                border-bottom: 2px solid #4a90e2;
+                padding-bottom: 10px;
+            }
+            
+            .input-group {
+                margin-bottom: 20px;
+            }
+            
+            label {
+                display: block;
+                margin-bottom: 8px;
+                font-weight: bold;
+                color: #4a90e2;
+            }
+            
+            input[type="number"], select {
+                width: 100%;
+                padding: 10px;
+                border: 2px solid #4a90e2;
+                border-radius: 5px;
+                background: rgba(255, 255, 255, 0.1);
+                color: #fff;
+                font-size: 16px;
+            }
+            
+            input[type="number"]:focus, select:focus {
+                outline: none;
+                border-color: #64b5f6;
+                background: rgba(255, 255, 255, 0.15);
+            }
+            
+            .bl-input-group {
+                display: flex;
+                gap: 10px;
+            }
+            
+            .bl-input-group select {
+                width: 100px;
+            }
+            
+            .bl-input-group input {
+                flex: 1;
+            }
+            
+            button {
+                width: 100%;
+                padding: 12px;
+                background: #4a90e2;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                font-size: 16px;
+                font-weight: bold;
+                cursor: pointer;
+                transition: background 0.3s;
+                margin-bottom: 10px;
+            }
+            
+            button:hover {
+                background: #357abd;
+            }
+            
+            .info-box {
+                background: rgba(74, 144, 226, 0.2);
+                border: 1px solid #4a90e2;
+                border-radius: 5px;
+                padding: 15px;
+                margin-top: 20px;
+            }
+            
+            .info-box h3 {
+                color: #64b5f6;
+                margin-bottom: 10px;
+                font-size: 16px;
+            }
+            
+            .info-box p {
+                margin: 5px 0;
+                font-size: 14px;
+            }
+            
+            .reference-points {
+                font-size: 12px;
+                line-height: 1.6;
+            }
+            
+            .reference-points strong {
+                color: #64b5f6;
+            }
+            
+            #canvas-container {
+                width: 100%;
+                height: 100%;
+            }
+            
+            .controls {
+                position: absolute;
+                top: 20px;
+                right: 20px;
+                background: rgba(0, 0, 0, 0.7);
+                padding: 15px;
+                border-radius: 8px;
+                z-index: 100;
+            }
+            
+            .controls button {
+                margin-bottom: 8px;
+                font-size: 14px;
+            }
+            
+            .opacity-control {
+                margin-top: 10px;
+            }
+            
+            .opacity-control input[type="range"] {
+                width: 100%;
+            }
+            
+            .coord-display {
+                position: absolute;
+                top: 20px;
+                left: 20px;
+                background: rgba(0, 0, 0, 0.8);
+                padding: 15px;
+                border-radius: 8px;
+                border: 2px solid #4a90e2;
+                display: none;
+                z-index: 100;
+            }
+            
+            .coord-display h4 {
+                color: #4a90e2;
+                margin-bottom: 8px;
+            }
+            
+            .coord-display p {
+                margin: 4px 0;
+                font-size: 14px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="sidebar">
+                <h1>Boeing 737 MAX<br>Coordinate Viewer</h1>
+                
+                <div class="input-group">
+                    <label for="aircraft-type">Aircraft Type:</label>
+                    <select id="aircraft-type">
+                        <option value="737-8">Boeing 737-8 MAX</option>
+                        <option value="737-9">Boeing 737-9 MAX</option>
+                    </select>
+                </div>
+                
+                <div class="input-group">
+                    <label for="station">Station (STA):</label>
+                    <input type="number" id="station" placeholder="Enter station (130-1217)" min="130" max="1217" value="500">
+                </div>
+                
+                <div class="input-group">
+                    <label for="waterline">Waterline (WL):</label>
+                    <input type="number" id="waterline" placeholder="Enter waterline" value="200">
+                </div>
+                
+                <div class="input-group">
+                    <label for="buttock-line">Buttock Line (BL):</label>
+                    <div class="bl-input-group">
+                        <select id="bl-side">
+                            <option value="L">LBL (Left)</option>
+                            <option value="R">RBL (Right)</option>
+                        </select>
+                        <input type="number" id="buttock-line" placeholder="Enter BL value" value="0">
+                    </div>
+                </div>
+                
+                <button onclick="plotCoordinate()">Plot Coordinate</button>
+                <button onclick="clearMarker()">Clear Marker</button>
+                
+                <div class="info-box">
+                    <h3>Current Position</h3>
+                    <p id="current-sta">STA: -</p>
+                    <p id="current-wl">WL: -</p>
+                    <p id="current-bl">BL: -</p>
+                    <p id="current-section">Section: -</p>
+                </div>
+                
+                <div class="info-box reference-points">
+                    <h3>Reference Points</h3>
+                    <p><strong>STA 130:</strong> Nose</p>
+                    <p><strong>STA 312-344:</strong> Forward Entry Door (Left, WL 208.54+)</p>
+                    <p><strong>STA 323.7-351.2:</strong> Electronics Compartment (Bottom)</p>
+                    <p><strong>STA 492.4:</strong> Forward Cargo Door</p>
+                    <p><strong>STA 578-727:</strong> Section 44 (Wing)</p>
+                    <p><strong>STA 794.3:</strong> Aft Cargo Door</p>
+                    <p><strong>STA 1217:</strong> Tail (737-8)</p>
+                    <p><strong>STA 1277:</strong> Tail (737-9)</p>
+                </div>
+            </div>
+            
+            <div class="main-content">
+                <div id="canvas-container"></div>
+                
+                <div class="controls">
+                    <button onclick="toggleTransparency()">Toggle Transparency</button>
+                    <button onclick="toggleWireframe()">Toggle Wireframe</button>
+                    <div class="opacity-control">
+                        <label>Opacity: <span id="opacity-value">30</span>%</label>
+                        <input type="range" id="opacity-slider" min="0" max="100" value="30" oninput="updateOpacity(this.value)">
+                    </div>
+                </div>
+                
+                <div class="coord-display" id="coord-display">
+                    <h4>Clicked Coordinate</h4>
+                    <p id="click-sta">STA: -</p>
+                    <p id="click-wl">WL: -</p>
+                    <p id="click-bl">BL: -</p>
+                </div>
+            </div>
+        </div>
+    
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+        
+        <script>
+            let scene, camera, renderer, controls;
+            let fuselage, wings, tail, marker;
+            let raycaster, mouse;
+            let isTransparent = true;
+            let isWireframe = false;
+            
+            // Boeing 737 MAX dimensions and station mapping
+            const AIRCRAFT_DATA = {
+                '737-8': { length: 39.52, tailStation: 1217 },
+                '737-9': { length: 42.16, tailStation: 1277 }
+            };
+            
+            const NOSE_STATION = 130;
+            
+            function init() {
+                // Scene setup
+                scene = new THREE.Scene();
+                scene.background = new THREE.Color(0x000000);
+                
+                // Camera setup
+                const container = document.getElementById('canvas-container');
+                camera = new THREE.PerspectiveCamera(
+                    75,
+                    container.clientWidth / container.clientHeight,
+                    0.1,
+                    1000
+                );
+                camera.position.set(30, 15, 30);
+                
+                // Renderer setup
+                renderer = new THREE.WebGLRenderer({ antialias: true });
+                renderer.setSize(container.clientWidth, container.clientHeight);
+                container.appendChild(renderer.domElement);
+                
+                // Controls
+                controls = new THREE.OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true;
+                controls.dampingFactor = 0.05;
+                
+                // Raycaster for mouse interaction
+                raycaster = new THREE.Raycaster();
+                mouse = new THREE.Vector2();
+                
+                // Lighting
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+                scene.add(ambientLight);
+                
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+                directionalLight.position.set(10, 10, 10);
+                scene.add(directionalLight);
+                
+                const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.4);
+                directionalLight2.position.set(-10, -10, -10);
+                scene.add(directionalLight2);
+                
+                // Grid
+                const gridHelper = new THREE.GridHelper(100, 50, 0x4a90e2, 0x2a5298);
+                scene.add(gridHelper);
+                
+                // Axes helper
+                const axesHelper = new THREE.AxesHelper(20);
+                scene.add(axesHelper);
+                
+                // Create aircraft
+                createAircraft();
+                
+                // Event listeners
+                window.addEventListener('resize', onWindowResize);
+                renderer.domElement.addEventListener('click', onMouseClick);
+                
+                // Animation loop
+                animate();
+            }
+            
+            function createAircraft() {
+                const aircraftType = document.getElementById('aircraft-type').value;
+                const aircraftLength = AIRCRAFT_DATA[aircraftType].length;
+                
+                // Fuselage
+                const fuselageGeometry = new THREE.CylinderGeometry(1.8, 1.8, aircraftLength, 32);
+                const fuselageMaterial = new THREE.MeshPhongMaterial({
+                    color: 0xcccccc,
+                    transparent: true,
+                    opacity: 0.3,
+                    side: THREE.DoubleSide
+                });
+                fuselage = new THREE.Mesh(fuselageGeometry, fuselageMaterial);
+                fuselage.rotation.z = Math.PI / 2;
+                fuselage.position.x = 0;
+                scene.add(fuselage);
+                
+                // Nose cone pointing FORWARD (positive X direction)
+                const noseGeometry = new THREE.ConeGeometry(1.8, 4, 32);
+                const noseMaterial = new THREE.MeshPhongMaterial({
+                    color: 0xcccccc,
+                    transparent: true,
+                    opacity: 0.3
+                });
+                const nose = new THREE.Mesh(noseGeometry, noseMaterial);
+                nose.rotation.z = -Math.PI / 2; // Point towards positive X
+                nose.position.x = -aircraftLength / 2 - 2; // Position at front
+                scene.add(nose);
+                
+                // Wings (horizontal, extending from sides)
+                const wingGeometry = new THREE.BoxGeometry(8, 0.3, 18);
+                const wingMaterial = new THREE.MeshPhongMaterial({ color: 0x999999 });
+                wings = new THREE.Mesh(wingGeometry, wingMaterial);
+                wings.position.set(5, 0, 0); // Position at wing section
+                scene.add(wings);
+                
+                // Horizontal stabilizer
+                const hStabGeometry = new THREE.BoxGeometry(3, 0.2, 8);
+                const hStabMaterial = new THREE.MeshPhongMaterial({ color: 0x999999 });
+                const hStab = new THREE.Mesh(hStabGeometry, hStabMaterial);
+                hStab.position.set(aircraftLength / 2 - 2, 0, 0);
+                scene.add(hStab);
+                
+                // Vertical stabilizer
+                const vStabGeometry = new THREE.BoxGeometry(3, 4, 0.2);
+                const vStabMaterial = new THREE.MeshPhongMaterial({ color: 0x999999 });
+                tail = new THREE.Mesh(vStabGeometry, vStabMaterial);
+                tail.position.set(aircraftLength / 2 - 1, 2, 0);
+                scene.add(tail);
+                
+                // Forward Entry Door - LEFT SIDE (negative Z), between STA 312-344, above WL 208.54
+                const doorGeometry = new THREE.BoxGeometry(1.5, 2, 0.1);
+                const doorMaterial = new THREE.MeshPhongMaterial({ color: 0xff6600 });
+                const forwardDoor = new THREE.Mesh(doorGeometry, doorMaterial);
+                
+                // Calculate door position
+                const doorSTA = (312 + 344) / 2; // Center of door at STA 328
+                const doorX = staToX(doorSTA, aircraftLength);
+                const doorWL = 240; // Above WL 208.54
+                const doorY = wlToY(doorWL);
+                const doorZ = -2.0; // LEFT SIDE (negative Z)
+                
+                forwardDoor.position.set(doorX, doorY, doorZ);
+                scene.add(forwardDoor);
+                
+                // Door label
+                const doorLabel = createTextSprite('Forward Entry Door\nSTA 312-344');
+                doorLabel.position.set(doorX, doorY + 2, doorZ);
+                scene.add(doorLabel);
+                
+                // Electronics Compartment - bottom of fuselage between STA 323.7 and 351.2
+                const elecLength = staToX(351.2, aircraftLength) - staToX(323.7, aircraftLength);
+                const elecGeometry = new THREE.BoxGeometry(elecLength, 0.5, 1.5);
+                const elecMaterial = new THREE.MeshBasicMaterial({
+                    color: 0x0088ff,
+                    wireframe: true,
+                    transparent: true,
+                    opacity: 0.8
+                });
+                const electronics = new THREE.Mesh(elecGeometry, elecMaterial);
+                const elecX = (staToX(323.7, aircraftLength) + staToX(351.2, aircraftLength)) / 2;
+                electronics.position.set(elecX, -2.2, 0);
+                scene.add(electronics);
+                
+                // Electronics label
+                const elecLabel = createTextSprite('Electronics\nCompartment');
+                elecLabel.position.set(elecX, -3.5, 0);
+                scene.add(elecLabel);
+            }
+            
+            function createTextSprite(text) {
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.width = 256;
+                canvas.height = 128;
+                
+                context.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                context.fillRect(0, 0, canvas.width, canvas.height);
+                
+                context.font = 'Bold 20px Arial';
+                context.fillStyle = 'white';
+                context.textAlign = 'center';
+                
+                const lines = text.split('\n');
+                lines.forEach((line, i) => {
+                    context.fillText(line, canvas.width / 2, 40 + i * 30);
+                });
+                
+                const texture = new THREE.Texture(canvas);
+                texture.needsUpdate = true;
+                
+                const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
+                const sprite = new THREE.Sprite(spriteMaterial);
+                sprite.scale.set(4, 2, 1);
+                
+                return sprite;
+            }
+            
+            function staToX(sta, aircraftLength) {
+                const aircraftType = document.getElementById('aircraft-type').value;
+                const tailStation = AIRCRAFT_DATA[aircraftType].tailStation;
+                const stationRange = tailStation - NOSE_STATION;
+                const normalizedSta = (sta - NOSE_STATION) / stationRange;
+                return (normalizedSta - 0.5) * aircraftLength;
+            }
+            
+            function xToSta(x, aircraftLength) {
+                const aircraftType = document.getElementById('aircraft-type').value;
+                const tailStation = AIRCRAFT_DATA[aircraftType].tailStation;
+                const stationRange = tailStation - NOSE_STATION;
+                const normalizedX = (x / aircraftLength) + 0.5;
+                return NOSE_STATION + (normalizedX * stationRange);
+            }
+            
+            function wlToY(wl) {
+                return (wl - 200) / 50;
+            }
+            
+            function yToWL(y) {
+                return (y * 50) + 200;
+            }
+            
+            function blToZ(bl, side) {
+                // Left side is negative Z, Right side is positive Z
+                const zValue = bl / 20;
+                return side === 'L' ? -zValue : zValue;
+            }
+            
+            function zToBL(z) {
+                return Math.abs(z * 20);
+            }
+            
+            function getSide(z) {
+                return z < 0 ? 'L' : 'R';
+            }
+            
+            function getSectionFromSTA(sta) {
+                if (sta >= 130 && sta < 323.7) return 'Section 41 (Nose/Cockpit)';
+                if (sta >= 323.7 && sta < 578) return 'Section 43 (Forward Cabin)';
+                if (sta >= 578 && sta < 727) return 'Section 44 (Wing/Center)';
+                if (sta >= 727 && sta < 847) return 'Section 46 (Aft Cabin)';
+                if (sta >= 847 && sta < 1040) return 'Section 47 (Rear Fuselage)';
+                if (sta >= 1040) return 'Section 48 (Tail)';
+                return 'Unknown Section';
+            }
+            
+            function plotCoordinate() {
+                const sta = parseFloat(document.getElementById('station').value);
+                const wl = parseFloat(document.getElementById('waterline').value);
+                const bl = parseFloat(document.getElementById('buttock-line').value);
+                const blSide = document.getElementById('bl-side').value;
+                
+                if (isNaN(sta) || isNaN(wl) || isNaN(bl)) {
+                    alert('Please enter valid numeric coordinates');
+                    return;
+                }
+                
+                const aircraftType = document.getElementById('aircraft-type').value;
+                const aircraftLength = AIRCRAFT_DATA[aircraftType].length;
+                
+                // Remove existing marker
+                if (marker) {
+                    scene.remove(marker);
+                }
+                
+                // Convert coordinates to 3D position
+                const x = staToX(sta, aircraftLength);
+                const y = wlToY(wl);
+                const z = blToZ(bl, blSide);
+                
+                // Create marker
+                const markerGeometry = new THREE.SphereGeometry(0.3, 16, 16);
+                const markerMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+                marker = new THREE.Mesh(markerGeometry, markerMaterial);
+                marker.position.set(x, y, z);
+                scene.add(marker);
+                
+                // Add pulsing animation
+                marker.userData.pulsePhase = 0;
+                
+                // Update info
+                document.getElementById('current-sta').textContent = `STA: ${sta.toFixed(1)}`;
+                document.getElementById('current-wl').textContent = `WL: ${wl.toFixed(1)}`;
+                document.getElementById('current-bl').textContent = `${blSide}BL: ${bl.toFixed(1)}`;
+                document.getElementById('current-section').textContent = getSectionFromSTA(sta);
+            }
+            
+            function clearMarker() {
+                if (marker) {
+                    scene.remove(marker);
+                    marker = null;
+                }
+                document.getElementById('current-sta').textContent = 'STA: -';
+                document.getElementById('current-wl').textContent = 'WL: -';
+                document.getElementById('current-bl').textContent = 'BL: -';
+                document.getElementById('current-section').textContent = 'Section: -';
+            }
+            
+            function toggleTransparency() {
+                isTransparent = !isTransparent;
+                fuselage.material.opacity = isTransparent ? 0.3 : 1.0;
+            }
+            
+            function toggleWireframe() {
+                isWireframe = !isWireframe;
+                fuselage.material.wireframe = isWireframe;
+            }
+            
+            function updateOpacity(value) {
+                document.getElementById('opacity-value').textContent = value;
+                fuselage.material.opacity = value / 100;
+            }
+            
+            function onMouseClick(event) {
+                const container = document.getElementById('canvas-container');
+                const rect = container.getBoundingClientRect();
+                
+                mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+                mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+                
+                raycaster.setFromCamera(mouse, camera);
+                
+                const intersects = raycaster.intersectObjects(scene.children, true);
+                
+                if (intersects.length > 0) {
+                    const point = intersects[0].point;
+                    const aircraftType = document.getElementById('aircraft-type').value;
+                    const aircraftLength = AIRCRAFT_DATA[aircraftType].length;
+                    
+                    const sta = xToSta(point.x, aircraftLength);
+                    const wl = yToWL(point.y);
+                    const bl = zToBL(point.z);
+                    const side = getSide(point.z);
+                    
+                    // Update clicked coordinate display
+                    document.getElementById('click-sta').textContent = `STA: ${sta.toFixed(1)}`;
+                    document.getElementById('click-wl').textContent = `WL: ${wl.toFixed(1)}`;
+                    document.getElementById('click-bl').textContent = `${side}BL: ${bl.toFixed(1)}`;
+                    document.getElementById('coord-display').style.display = 'block';
+                    
+                    // Auto-hide after 5 seconds
+                    setTimeout(() => {
+                        document.getElementById('coord-display').style.display = 'none';
+                    }, 5000);
+                }
+            }
+            
+            function onWindowResize() {
+                const container = document.getElementById('canvas-container');
+                camera.aspect = container.clientWidth / container.clientHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(container.clientWidth, container.clientHeight);
+            }
+            
+            function animate() {
+                requestAnimationFrame(animate);
+                
+                // Pulse marker animation
+                if (marker) {
+                    marker.userData.pulsePhase += 0.05;
+                    const scale = 1 + Math.sin(marker.userData.pulsePhase) * 0.3;
+                    marker.scale.set(scale, scale, scale);
+                }
+                
+                controls.update();
+                renderer.render(scene, camera);
+            }
+            
+            // Initialize on load
+            window.addEventListener('load', init);
+        </script>
+    </body>
+    </html>
