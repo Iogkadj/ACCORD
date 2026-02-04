@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Boeing 737 MAX Coordinate Viewer - Accurate Model</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+    
+            body {
+                font-family: 'Arial', sans-serif;
+                background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+                min-height: 100vh;
+                display: flex;
+                overflow: hidden;
+            }
+    
+            .sidebar {
+                width: 350px;
+                background: rgba(255, 255, 255, 0.95);
+                padding: 25px;
+                overflow-y: auto;
+                box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+            }
+    
+            .main-view {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+            }
+    
+            h1 {
+                color: #1e3c72;
+                margin-bottom: 20px;
+                font-size: 24px;
+                border-bottom: 3px solid #1e3c72;
+                padding-bottom: 10px;
+            }
+    
+            .input-group {
+                margin-bottom: 20px;
+            }
+    
+            label {
+                display: block;
+                margin-bottom: 8px;
+                color: #333;
+                font-weight: bold;
+                font-size: 14px;
+            }
+    
+            input[type="number"] {
+                width: 100%;
+                padding: 12px;
+                border: 2px solid #ddd;
+                border-radius: 6px;
+                font-size: 16px;
+                transition: border-color 0.3s;
+            }
+    
+            input[type="number"]:focus {
+                outline: none;
+                border-color: #1e3c72;
+            }
+    
+            button {
+                width: 100%;
+                padding: 14px;
+                background: #1e3c72;
+                color: white;
+                border: none;
+                border-radius: 6px;
+                font-size: 16px;
+                font-weight: bold;
+                cursor: pointer;
+                transition: background 0.3s;
+                margin-bottom: 10px;
+            }
+    
+            button:hover {
+                background: #2a5298;
+            }
+    
+            .aircraft-selector {
+                margin-bottom: 20px;
+            }
+    
+            select {
+                width: 100%;
+                padding: 12px;
+                border: 2px solid #ddd;
+                border-radius: 6px;
+                font-size: 16px;
+                background: white;
+            }
+    
+            .info-box {
+                background: #f0f4f8;
+                padding: 15px;
+                border-radius: 6px;
+                margin-top: 20px;
+                font-size: 13px;
+                line-height: 1.6;
+            }
+    
+            .info-box h3 {
+                color: #1e3c72;
+                margin-bottom: 10px;
+                font-size: 16px;
+            }
+    
+            .coordinate-display {
+                background: #e8f0fe;
+                padding: 15px;
+                border-radius: 6px;
+                margin-top: 15px;
+                border-left: 4px solid #1e3c72;
+            }
+    
+            .coordinate-display p {
+                margin: 5px 0;
+                font-size: 14px;
+                color: #333;
+            }
+    
+            #canvas-container {
+                flex: 1;
+                position: relative;
+                background: linear-gradient(to bottom, #87CEEB 0%, #E0F6FF 100%);
+            }
+    
+            .reference-points {
+                margin-top: 15px;
+                font-size: 12px;
+                color: #666;
+            }
+    
+            .reference-points p {
+                margin: 4px 0;
+                padding: 4px 8px;
+                background: #fff;
+                border-radius: 3px;
+            }
+    
+            .controls {
+                background: rgba(255, 255, 255, 0.95);
+                padding: 15px;
+                display: flex;
+                gap: 10px;
+                flex-wrap: wrap;
+            }
+    
+            .control-btn {
+                padding: 10px 20px;
+                background: #2a5298;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 14px;
+            }
+    
+            .control-btn:hover {
+                background: #1e3c72;
+            }
+    
+            .section-info {
+                background: #fff3cd;
+                padding: 10px;
+                border-radius: 4px;
+                margin-top: 10px;
+                font-size: 12px;
+                border-left: 4px solid #ffc107;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="sidebar">
+            <h1>Boeing 737 MAX<br>Coordinate Viewer</h1>
+            
+            <div class="aircraft-selector">
+                <label for="aircraft-type">Aircraft Type:</label>
+                <select id="aircraft-type">
+                    <option value="737-8">Boeing 737-8 MAX</option>
+                    <option value="737-9">Boeing 737-9 MAX</option>
+                </select>
+            </div>
+    
+            <div class="input-group">
+                <label for="station">Station (STA):</label>
+                <input type="number" id="station" placeholder="e.g., 700" step="0.1">
+            </div>
+    
+            <div class="input-group">
+                <label for="waterline">Waterline (WL):</label>
+                <input type="number" id="waterline" placeholder="e.g., 208.1" step="0.1">
+            </div>
+    
+            <div class="input-group">
+                <label for="buttline">Buttock Line (BL):</label>
+                <input type="number" id="buttline" placeholder="e.g., 0 (centerline)" step="0.1">
+            </div>
+    
+            <button onclick="plotCoordinate()">Plot Coordinate</button>
+            <button onclick="clearMarker()" style="background: #dc3545;">Clear Marker</button>
+    
+            <div class="coordinate-display" id="coord-display" style="display:none;">
+                <h3 style="margin:0 0 10px 0; color:#1e3c72;">Current Position:</h3>
+                <p><strong>STA:</strong> <span id="display-sta">-</span></p>
+                <p><strong>WL:</strong> <span id="display-wl">-</span></p>
+                <p><strong>BL:</strong> <span id="display-bl">-</span></p>
+                <p><strong>Section:</strong> <span id="display-section">-</span></p>
+            </div>
+    
+            <div class="info-box">
+                <h3>Coordinate System:</h3>
+                <p><strong>Station (STA):</strong> Longitudinal position (130 = nose, 1217 = tail)</p>
+                <p><strong>Waterline (WL):</strong> Vertical position above reference (148.5-308.5)</p>
+                <p><strong>Buttock Line (BL):</strong> Lateral position from centerline (0 = center, ±64 = sides)</p>
+            </div>
+    
+            <div class="reference-points">
+                <h3 style="color:#1e3c72; margin-bottom:8px;">Key Stations:</h3>
+                <p><strong>STA 130:</strong> Nose</p>
+                <p><strong>STA 249.5:</strong> Fwd Galley Door</p>
+                <p><strong>STA 492.4:</strong> Fwd Cargo Door (Section 43)</p>
+                <p><strong>STA 700:</strong> Wing Center (Section 44)</p>
+                <p><strong>STA 794.3:</strong> Aft Cargo Door (Section 46)</p>
+                <p><strong>STA 1217:</strong> Tail (737-8)</p>
+            </div>
+    
+            <div class="section-info">
+                <strong>Fuselage Sections:</strong><br>
+                • Section 41: STA 130-400<br>
+                • Section 43: STA 390-540<br>
+                • Section 44: STA 578-727 (Wing)<br>
+                • Section 46: STA 727-847<br>
+                • Section 47: STA 727-887<br>
+                • Section 48: STA 847-1217
+            </div>
+        </div>
+    
+        <div class="main-view">
+            <div class="controls">
+                <button class="control-btn" onclick="resetView()">Reset View</button>
+                <button class="control-btn" onclick="toggleTransparency()">Toggle Transparency</button>
+                <button class="control-btn" onclick="toggleWireframe()">Toggle Wireframe</button>
+                <label style="margin-left:20px; display:flex; align-items:center; gap:10px;">
+                    <span>Opacity:</span>
+                    <input type="range" id="opacity-slider" min="0" max="100" value="30" 
+                           oninput="updateOpacity(this.value)" style="width:150px;">
+                    <span id="opacity-value">30%</span>
+                </label>
+            </div>
+            <div id="canvas-container"></div>
+        </div>
+    
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    
+        <script>
+            // Accurate Boeing 737 MAX station mapping based on technical drawings
+            const BOEING_737_STATIONS = {
+                nose: 130,
+                section41_end: 400,
+                section43_start: 390,
+                section43_cargo: 492.4,
+                section43_end: 540,
+                section44_start: 578,
+                section44_wing: 700,  // Wing center section
+                section44_end: 727,
+                section46_start: 727,
+                section46_cargo: 794.3,
+                section46_end: 847,
+                section48_start: 847,
+                tail_737_8: 1217,
+                tail_737_9: 1290
+            };
+    
+            // Scene setup
+            let scene, camera, renderer, controls;
+            let fuselage, wings, tail, marker;
+            let fuselageMaterial;
+            let isWireframe = false;
+    
+            function init() {
+                // Scene
+                scene = new THREE.Scene();
+                scene.background = new THREE.Color(0x87CEEB);
+    
+                // Camera
+                const container = document.getElementById('canvas-container');
+                camera = new THREE.PerspectiveCamera(
+                    50,
+                    container.clientWidth / container.clientHeight,
+                    0.1,
+                    10000
+                );
+                camera.position.set(800, 300, 1200);
+    
+                // Renderer
+                renderer = new THREE.WebGLRenderer({ antialias: true });
+                renderer.setSize(container.clientWidth, container.clientHeight);
+                renderer.shadowMap.enabled = true;
+                container.appendChild(renderer.domElement);
+    
+                // Controls
+                controls = new THREE.OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true;
+                controls.dampingFactor = 0.05;
+    
+                // Lights
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+                scene.add(ambientLight);
+    
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+                directionalLight.position.set(500, 500, 500);
+                directionalLight.castShadow = true;
+                scene.add(directionalLight);
+    
+                const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.4);
+                directionalLight2.position.set(-500, 300, -500);
+                scene.add(directionalLight2);
+    
+                // Build aircraft
+                createAircraft();
+                createGrid();
+    
+                // Animation loop
+                animate();
+    
+                // Handle window resize
+                window.addEventListener('resize', onWindowResize);
+            }
+    
+            function createAircraft() {
+                const aircraft = new THREE.Group();
+    
+                // Accurate fuselage based on Boeing 737 dimensions
+                // Total length for 737-8: ~1087 inches (from STA 130 to STA 1217)
+                const fuselageLength = BOEING_737_STATIONS.tail_737_8 - BOEING_737_STATIONS.nose;
+                const fuselageRadius = 74; // Approximate fuselage radius in inches
+    
+                // Create transparent fuselage material
+                fuselageMaterial = new THREE.MeshPhongMaterial({
+                    color: 0xcccccc,
+                    transparent: true,
+                    opacity: 0.3,
+                    side: THREE.DoubleSide,
+                    depthWrite: false
+                });
+    
+                // Fuselage - use multiple cylinders for different sections
+                const fuselageGroup = new THREE.Group();
+                
+                // Nose section (tapered)
+                const noseGeometry = new THREE.ConeGeometry(fuselageRadius, 150, 32);
+                const nose = new THREE.Mesh(noseGeometry, fuselageMaterial);
+                nose.rotation.z = -Math.PI / 2;
+                nose.position.x = -fuselageLength/2 + 75;
+                fuselageGroup.add(nose);
+    
+                // Main cylindrical fuselage
+                const mainFuselageGeometry = new THREE.CylinderGeometry(
+                    fuselageRadius, fuselageRadius, fuselageLength - 200, 32
+                );
+                const mainFuselage = new THREE.Mesh(mainFuselageGeometry, fuselageMaterial);
+                mainFuselage.rotation.z = Math.PI / 2;
+                mainFuselage.position.x = 50;
+                fuselageGroup.add(mainFuselage);
+    
+                // Tail section (tapered)
+                const tailGeometry = new THREE.ConeGeometry(fuselageRadius, 100, 32);
+                const tailCone = new THREE.Mesh(tailGeometry, fuselageMaterial);
+                tailCone.rotation.z = Math.PI / 2;
+                tailCone.position.x = fuselageLength/2 - 25;
+                fuselageGroup.add(tailCone);
+    
+                fuselage = fuselageGroup;
+                aircraft.add(fuselage);
+    
+                // Wings - positioned at Section 44 (around STA 700)
+                const wingMaterial = new THREE.MeshPhongMaterial({
+                    color: 0x2a5298,
+                    transparent: true,
+                    opacity: 0.7
+                });
+    
+                // Calculate wing position based on accurate station
+                const wingStation = BOEING_737_STATIONS.section44_wing;
+                const wingXPosition = stationToX(wingStation);
+    
+                // Main wing box
+                const wingGeometry = new THREE.BoxGeometry(30, 450, 120);
+                const wing = new THREE.Mesh(wingGeometry, wingMaterial);
+                wing.position.set(wingXPosition, 0, -fuselageRadius - 60);
+                aircraft.add(wing);
+    
+                // Wing sweep
+                const wingletGeometry = new THREE.BoxGeometry(15, 180, 60);
+                const wingletL = new THREE.Mesh(wingletGeometry, wingMaterial);
+                wingletL.position.set(wingXPosition + 40, 0, -fuselageRadius - 285);
+                wingletL.rotation.y = -0.3;
+                aircraft.add(wingletL);
+    
+                const wingletR = new THREE.Mesh(wingletGeometry, wingMaterial);
+                wingletR.position.set(wingXPosition + 40, 0, fuselageRadius + 285);
+                wingletR.rotation.y = 0.3;
+                aircraft.add(wingletR);
+    
+                wings = new THREE.Group();
+                wings.add(wing, wingletL, wingletR);
+                aircraft.add(wings);
+    
+                // Horizontal stabilizer - at tail
+                const hstabGeometry = new THREE.BoxGeometry(20, 200, 8);
+                const hstab = new THREE.Mesh(hstabGeometry, wingMaterial);
+                hstab.position.set(fuselageLength/2 - 100, 0, 0);
+                aircraft.add(hstab);
+    
+                // Vertical stabilizer
+                const vstabGeometry = new THREE.BoxGeometry(20, 8, 120);
+                const vstab = new THREE.Mesh(vstabGeometry, wingMaterial);
+                vstab.position.set(fuselageLength/2 - 100, 100, 0);
+                aircraft.add(vstab);
+    
+                tail = new THREE.Group();
+                tail.add(hstab, vstab);
+                aircraft.add(tail);
+    
+                scene.add(aircraft);
+            }
+    
+            function createGrid() {
+                const gridHelper = new THREE.GridHelper(2000, 20, 0x444444, 0x888888);
+                gridHelper.position.y = -150;
+                scene.add(gridHelper);
+    
+                // Add axes helper
+                const axesHelper = new THREE.AxesHelper(500);
+                scene.add(axesHelper);
+            }
+    
+            // Convert Boeing station to 3D X coordinate
+            function stationToX(station) {
+                const minStation = BOEING_737_STATIONS.nose;
+                const maxStation = BOEING_737_STATIONS.tail_737_8;
+                const fuselageLength = maxStation - minStation;
+                
+                // Normalize station to -fuselageLength/2 to +fuselageLength/2
+                const normalizedPosition = (station - minStation) / fuselageLength;
+                return (normalizedPosition - 0.5) * fuselageLength;
+            }
+    
+            // Convert waterline to 3D Y coordinate
+            function waterlineToY(waterline) {
+                // WL 148.5 is bottom, WL 308.5 is top (typical range)
+                // Center at WL 228 (middle of fuselage)
+                return waterline - 228;
+            }
+    
+            // Convert buttock line to 3D Z coordinate
+            function buttlineToZ(buttline) {
+                // BL 0 is centerline, positive is right side
+                return -buttline; // Negative for proper orientation
+            }
+    
+            function determineSection(station) {
+                if (station >= BOEING_737_STATIONS.nose && station < BOEING_737_STATIONS.section41_end) {
+                    return "Section 41 (Nose/Cockpit)";
+                } else if (station >= BOEING_737_STATIONS.section43_start && station < BOEING_737_STATIONS.section43_end) {
+                    return "Section 43 (Forward Fuselage/Cargo)";
+                } else if (station >= BOEING_737_STATIONS.section44_start && station < BOEING_737_STATIONS.section44_end) {
+                    return "Section 44 (Wing Center)";
+                } else if (station >= BOEING_737_STATIONS.section46_start && station < BOEING_737_STATIONS.section46_end) {
+                    return "Section 46 (Aft Fuselage)";
+                } else if (station >= BOEING_737_STATIONS.section48_start && station <= BOEING_737_STATIONS.tail_737_8) {
+                    return "Section 48 (Tail)";
+                }
+                return "Unknown Section";
+            }
+    
+            function plotCoordinate() {
+                const station = parseFloat(document.getElementById('station').value);
+                const waterline = parseFloat(document.getElementById('waterline').value);
+                const buttline = parseFloat(document.getElementById('buttline').value);
+    
+                if (isNaN(station) || isNaN(waterline) || isNaN(buttline)) {
+                    alert('Please enter valid numeric coordinates for all three values.');
+                    return;
+                }
+    
+                // Remove existing marker
+                if (marker) {
+                    scene.remove(marker);
+                }
+    
+                // Convert to 3D coordinates
+                const x = stationToX(station);
+                const y = waterlineToY(waterline);
+                const z = buttlineToZ(buttline);
+    
+                // Create marker sphere
+                const markerGeometry = new THREE.SphereGeometry(15, 32, 32);
+                const markerMaterial = new THREE.MeshPhongMaterial({
+                    color: 0xff0000,
+                    emissive: 0xff0000,
+                    emissiveIntensity: 0.5
+                });
+                marker = new THREE.Mesh(markerGeometry, markerMaterial);
+                marker.position.set(x, y, z);
+                scene.add(marker);
+    
+                // Add pulsing animation to marker
+                marker.userData.originalScale = 1;
+                marker.userData.pulseTime = 0;
+    
+                // Update display
+                document.getElementById('display-sta').textContent = station.toFixed(1);
+                document.getElementById('display-wl').textContent = waterline.toFixed(1);
+                document.getElementById('display-bl').textContent = buttline.toFixed(1);
+                document.getElementById('display-section').textContent = determineSection(station);
+                document.getElementById('coord-display').style.display = 'block';
+    
+                // Move camera to show marker
+                controls.target.set(x, y, z);
+                camera.position.set(x + 400, y + 200, z + 600);
+                controls.update();
+            }
+    
+            function clearMarker() {
+                if (marker) {
+                    scene.remove(marker);
+                    marker = null;
+                }
+                document.getElementById('coord-display').style.display = 'none';
+                document.getElementById('station').value = '';
+                document.getElementById('waterline').value = '';
+                document.getElementById('buttline').value = '';
+            }
+    
+            function resetView() {
+                camera.position.set(800, 300, 1200);
+                controls.target.set(0, 0, 0);
+                controls.update();
+            }
+    
+            function toggleTransparency() {
+                const currentOpacity = fuselageMaterial.opacity;
+                fuselageMaterial.opacity = currentOpacity > 0.5 ? 0.3 : 0.8;
+            }
+    
+            function toggleWireframe() {
+                isWireframe = !isWireframe;
+                fuselageMaterial.wireframe = isWireframe;
+            }
+    
+            function updateOpacity(value) {
+                fuselageMaterial.opacity = value / 100;
+                document.getElementById('opacity-value').textContent = value + '%';
+            }
+    
+            function animate() {
+                requestAnimationFrame(animate);
+    
+                // Pulse marker
+                if (marker) {
+                    marker.userData.pulseTime += 0.05;
+                    const scale = 1 + Math.sin(marker.userData.pulseTime) * 0.2;
+                    marker.scale.set(scale, scale, scale);
+                }
+    
+                controls.update();
+                renderer.render(scene, camera);
+            }
+    
+            function onWindowResize() {
+                const container = document.getElementById('canvas-container');
+                camera.aspect = container.clientWidth / container.clientHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(container.clientWidth, container.clientHeight);
+            }
+    
+            // Initialize on load
+            init();
+        </script>
+    </body>
+    </html>
