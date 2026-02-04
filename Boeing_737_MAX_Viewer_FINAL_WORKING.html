@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Boeing 737 MAX Coordinate Viewer</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            body {
+                font-family: 'Arial', sans-serif;
+                background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+                overflow: hidden;
+            }
+            #container {
+                display: flex;
+                height: 100vh;
+            }
+            #sidebar {
+                width: 320px;
+                background: rgba(255, 255, 255, 0.95);
+                padding: 20px;
+                overflow-y: auto;
+                box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+            }
+            #viewer {
+                flex: 1;
+                position: relative;
+            }
+            h1 {
+                color: #1e3c72;
+                font-size: 20px;
+                margin-bottom: 20px;
+                border-bottom: 2px solid #1e3c72;
+                padding-bottom: 10px;
+            }
+            .input-group {
+                margin-bottom: 15px;
+            }
+            label {
+                display: block;
+                font-weight: bold;
+                margin-bottom: 5px;
+                color: #333;
+                font-size: 14px;
+            }
+            input, select {
+                width: 100%;
+                padding: 10px;
+                border: 2px solid #ddd;
+                border-radius: 5px;
+                font-size: 14px;
+                transition: border-color 0.3s;
+            }
+            input:focus, select:focus {
+                outline: none;
+                border-color: #1e3c72;
+            }
+            button {
+                width: 100%;
+                padding: 12px;
+                background: #1e3c72;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                font-size: 16px;
+                font-weight: bold;
+                cursor: pointer;
+                transition: background 0.3s;
+                margin-top: 10px;
+            }
+            button:hover {
+                background: #2a5298;
+            }
+            .info-panel {
+                background: #f0f0f0;
+                padding: 15px;
+                border-radius: 5px;
+                margin-top: 20px;
+            }
+            .info-panel h3 {
+                color: #1e3c72;
+                font-size: 14px;
+                margin-bottom: 10px;
+            }
+            .info-panel p {
+                font-size: 12px;
+                line-height: 1.6;
+                color: #555;
+                margin-bottom: 8px;
+            }
+            .reference-points {
+                background: #e8f4f8;
+                padding: 12px;
+                border-radius: 5px;
+                margin-top: 15px;
+            }
+            .reference-points h4 {
+                color: #1e3c72;
+                font-size: 13px;
+                margin-bottom: 8px;
+            }
+            .reference-points ul {
+                list-style: none;
+                font-size: 11px;
+                color: #555;
+            }
+            .reference-points li {
+                padding: 4px 0;
+                border-bottom: 1px solid #d0e8f0;
+            }
+            .bl-container {
+                display: flex;
+                gap: 10px;
+            }
+            .bl-container input {
+                flex: 2;
+            }
+            .bl-container select {
+                flex: 1;
+            }
+            #coordinates-display {
+                position: absolute;
+                top: 20px;
+                right: 20px;
+                background: rgba(0, 0, 0, 0.8);
+                color: white;
+                padding: 15px;
+                border-radius: 8px;
+                font-family: monospace;
+                font-size: 14px;
+                display: none;
+                z-index: 100;
+            }
+            #coordinates-display.active {
+                display: block;
+            }
+            .controls {
+                margin-top: 20px;
+                padding-top: 15px;
+                border-top: 2px solid #ddd;
+            }
+            .slider-group {
+                margin-bottom: 15px;
+            }
+            .slider-group input[type="range"] {
+                width: 100%;
+            }
+            .slider-value {
+                text-align: right;
+                font-size: 12px;
+                color: #666;
+                margin-top: 5px;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="container">
+            <div id="sidebar">
+                <h1>Boeing 737 MAX<br>Coordinate Viewer</h1>
+                
+                <div class="input-group">
+                    <label for="station">Station (STA)</label>
+                    <input type="number" id="station" placeholder="130 - 1217" min="130" max="1217" value="700">
+                </div>
+                
+                <div class="input-group">
+                    <label for="waterline">Waterline (WL)</label>
+                    <input type="number" id="waterline" placeholder="e.g., 246.1" value="246">
+                </div>
+                
+                <div class="input-group">
+                    <label for="buttockline">Buttock Line (BL)</label>
+                    <div class="bl-container">
+                        <input type="number" id="buttockline" placeholder="0 - 64" min="0" max="64" value="0">
+                        <select id="bl-side">
+                            <option value="center">Center</option>
+                            <option value="right">RBL</option>
+                            <option value="left">LBL</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <button onclick="plotCoordinate()">Plot Coordinate</button>
+                
+                <div class="controls">
+                    <h3 style="color: #1e3c72; font-size: 14px; margin-bottom: 10px;">View Controls</h3>
+                    <div class="slider-group">
+                        <label>Fuselage Opacity</label>
+                        <input type="range" id="opacity" min="0" max="100" value="30" oninput="updateOpacity(this.value)">
+                        <div class="slider-value"><span id="opacity-value">30</span>%</div>
+                    </div>
+                    <button onclick="toggleWireframe()">Toggle Wireframe</button>
+                </div>
+                
+                <div class="reference-points">
+                    <h4>Reference Stations</h4>
+                    <ul>
+                        <li><strong>STA 130:</strong> Nose</li>
+                        <li><strong>STA 291.5:</strong> Fwd Entry Door</li>
+                        <li><strong>STA 323.7-351.2:</strong> Electronics Bay</li>
+                        <li><strong>STA 492.4:</strong> Fwd Cargo Door</li>
+                        <li><strong>STA 700:</strong> Wing Center (Sec 44)</li>
+                        <li><strong>STA 794.3:</strong> Aft Cargo Door</li>
+                        <li><strong>STA 1217:</strong> Tail (737-8)</li>
+                    </ul>
+                </div>
+                
+                <div class="info-panel">
+                    <h3>Instructions</h3>
+                    <p><strong>Click</strong> on the aircraft to see coordinates at that location.</p>
+                    <p><strong>Left-click + drag:</strong> Rotate view</p>
+                    <p><strong>Right-click + drag:</strong> Pan view</p>
+                    <p><strong>Scroll:</strong> Zoom in/out</p>
+                </div>
+            </div>
+            
+            <div id="viewer">
+                <div id="coordinates-display">
+                    <div><strong>Clicked Position:</strong></div>
+                    <div>STA: <span id="click-sta">-</span></div>
+                    <div>WL: <span id="click-wl">-</span></div>
+                    <div>BL: <span id="click-bl">-</span></div>
+                </div>
+            </div>
+        </div>
+    
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+        
+        <script>
+            let scene, camera, renderer, controls;
+            let fuselage, marker;
+            let raycaster, mouse;
+            
+            // Boeing 737 MAX coordinate system
+            const STATIONS = {
+                MIN: 130,
+                MAX: 1217,
+                NOSE: 130,
+                FWD_ENTRY_DOOR_START: 312,
+                FWD_ENTRY_DOOR_END: 344,
+                ELECTRONICS_START: 323.7,
+                ELECTRONICS_END: 351.2,
+                WING_CENTER: 700,
+                TAIL: 1217
+            };
+            
+            const WATERLINES = {
+                MIN: 100,
+                MAX: 350,
+                FLOOR: 208.1,
+                ENTRY_DOOR_BOTTOM: 208.54
+            };
+            
+            const BUTTOCK_LINES = {
+                CENTER: 0,
+                MAX: 64
+            };
+            
+            function init() {
+                // Scene setup
+                scene = new THREE.Scene();
+                scene.background = new THREE.Color(0x1a1a2e);
+                
+                // Camera
+                const container = document.getElementById('viewer');
+                camera = new THREE.PerspectiveCamera(
+                    60,
+                    container.clientWidth / container.clientHeight,
+                    0.1,
+                    10000
+                );
+                camera.position.set(150, 100, 300);
+                
+                // Renderer
+                renderer = new THREE.WebGLRenderer({ antialias: true });
+                renderer.setSize(container.clientWidth, container.clientHeight);
+                container.appendChild(renderer.domElement);
+                
+                // Controls
+                controls = new THREE.OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true;
+                controls.dampingFactor = 0.05;
+                
+                // Raycaster for mouse interaction
+                raycaster = new THREE.Raycaster();
+                mouse = new THREE.Vector2();
+                
+                // Lights
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+                scene.add(ambientLight);
+                
+                const directionalLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
+                directionalLight1.position.set(100, 100, 100);
+                scene.add(directionalLight1);
+                
+                const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.4);
+                directionalLight2.position.set(-100, 50, -100);
+                scene.add(directionalLight2);
+                
+                // Grid
+                const gridHelper = new THREE.GridHelper(500, 50, 0x444444, 0x222222);
+                scene.add(gridHelper);
+                
+                // Axes helper
+                const axesHelper = new THREE.AxesHelper(100);
+                scene.add(axesHelper);
+                
+                // Create aircraft
+                createAircraft();
+                
+                // Event listeners
+                window.addEventListener('resize', onWindowResize);
+                renderer.domElement.addEventListener('click', onMouseClick);
+                
+                // Animation loop
+                animate();
+            }
+            
+            function createAircraft() {
+                const aircraftGroup = new THREE.Group();
+                
+                // Fuselage dimensions based on Boeing 737 MAX
+                const fuselageLength = staToWorld(STATIONS.MAX) - staToWorld(STATIONS.MIN);
+                const fuselageRadius = 30;
+                
+                // Main fuselage cylinder
+                const fuselageGeometry = new THREE.CylinderGeometry(
+                    fuselageRadius, 
+                    fuselageRadius, 
+                    fuselageLength, 
+                    32, 
+                    1, 
+                    false
+                );
+                const fuselageMaterial = new THREE.MeshPhongMaterial({
+                    color: 0xcccccc,
+                    transparent: true,
+                    opacity: 0.3,
+                    side: THREE.DoubleSide
+                });
+                fuselage = new THREE.Mesh(fuselageGeometry, fuselageMaterial);
+                fuselage.rotation.z = Math.PI / 2;
+                fuselage.position.x = (staToWorld(STATIONS.MAX) + staToWorld(STATIONS.MIN)) / 2;
+                fuselage.position.y = wlToWorld(246);
+                aircraftGroup.add(fuselage);
+                
+                // Nose cone (pointing FORWARD - positive X direction)
+                const noseGeometry = new THREE.ConeGeometry(fuselageRadius, 60, 32);
+                const noseMaterial = new THREE.MeshPhongMaterial({
+                    color: 0xaaaaaa,
+                    transparent: true,
+                    opacity: 0.3
+                });
+                const nose = new THREE.Mesh(noseGeometry, noseMaterial);
+                nose.rotation.z = -Math.PI / 2; // Point towards negative X (forward)
+                nose.position.x = staToWorld(STATIONS.MIN) - 30; // Position at nose
+                nose.position.y = wlToWorld(246);
+                aircraftGroup.add(nose);
+                
+                // Wings (horizontal, extending from sides)
+                const wingGeometry = new THREE.BoxGeometry(80, 3, 200);
+                const wingMaterial = new THREE.MeshPhongMaterial({ color: 0x888888 });
+                const wings = new THREE.Mesh(wingGeometry, wingMaterial);
+                wings.position.x = staToWorld(700);
+                wings.position.y = wlToWorld(230);
+                aircraftGroup.add(wings);
+                
+                // Horizontal stabilizer (tail - horizontal)
+                const hStabGeometry = new THREE.BoxGeometry(40, 2, 100);
+                const hStabMaterial = new THREE.MeshPhongMaterial({ color: 0x888888 });
+                const hStab = new THREE.Mesh(hStabGeometry, hStabMaterial);
+                hStab.position.x = staToWorld(1150);
+                hStab.position.y = wlToWorld(260);
+                aircraftGroup.add(hStab);
+                
+                // Vertical stabilizer (tail fin - vertical)
+                const vStabGeometry = new THREE.BoxGeometry(40, 60, 3);
+                const vStabMaterial = new THREE.MeshPhongMaterial({ color: 0x888888 });
+                const vStab = new THREE.Mesh(vStabGeometry, vStabMaterial);
+                vStab.position.x = staToWorld(1150);
+                vStab.position.y = wlToWorld(280);
+                aircraftGroup.add(vStab);
+                
+                // Forward Entry Door (STA 312-344, above WL 208.54, right side)
+                const doorGeometry = new THREE.BoxGeometry(
+                    staToWorld(344) - staToWorld(312), // width in X
+                    20, // height
+                    2 // depth
+                );
+                const doorMaterial = new THREE.MeshPhongMaterial({ color: 0xff6600 });
+                const door = new THREE.Mesh(doorGeometry, doorMaterial);
+                door.position.x = (staToWorld(312) + staToWorld(344)) / 2;
+                door.position.y = wlToWorld(220);
+                door.position.z = fuselageRadius + 1; // Right side (positive Z)
+                aircraftGroup.add(door);
+                
+                // Door label
+                const doorLabel = createTextSprite('FWD ENTRY DOOR');
+                doorLabel.position.copy(door.position);
+                doorLabel.position.y += 15;
+                aircraftGroup.add(doorLabel);
+                
+                // Electronics & Equipment Compartment (STA 323.7-351.2, bottom)
+                const electronicsGeometry = new THREE.BoxGeometry(
+                    staToWorld(351.2) - staToWorld(323.7),
+                    10,
+                    40
+                );
+                const electronicsMaterial = new THREE.MeshBasicMaterial({
+                    color: 0x0088ff,
+                    wireframe: true
+                });
+                const electronics = new THREE.Mesh(electronicsGeometry, electronicsMaterial);
+                electronics.position.x = (staToWorld(323.7) + staToWorld(351.2)) / 2;
+                electronics.position.y = wlToWorld(180); // Bottom of fuselage
+                aircraftGroup.add(electronics);
+                
+                // Electronics label
+                const elecLabel = createTextSprite('ELECTRONICS BAY');
+                elecLabel.position.copy(electronics.position);
+                elecLabel.position.y -= 15;
+                aircraftGroup.add(elecLabel);
+                
+                scene.add(aircraftGroup);
+            }
+            
+            function createTextSprite(text) {
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.width = 512;
+                canvas.height = 128;
+                
+                context.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                context.fillRect(0, 0, canvas.width, canvas.height);
+                
+                context.font = 'Bold 40px Arial';
+                context.fillStyle = 'white';
+                context.textAlign = 'center';
+                context.textBaseline = 'middle';
+                context.fillText(text, canvas.width / 2, canvas.height / 2);
+                
+                const texture = new THREE.CanvasTexture(canvas);
+                const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
+                const sprite = new THREE.Sprite(spriteMaterial);
+                sprite.scale.set(50, 12.5, 1);
+                
+                return sprite;
+            }
+            
+            function staToWorld(sta) {
+                // Map STA 130-1217 to world X coordinates
+                const staRange = STATIONS.MAX - STATIONS.MIN;
+                const normalized = (sta - STATIONS.MIN) / staRange;
+                return normalized * 400 - 200; // World space -200 to +200
+            }
+            
+            function wlToWorld(wl) {
+                // Map waterline to world Y coordinate
+                return (wl - WATERLINES.MIN) * 0.5; // Scale factor
+            }
+            
+            function blToWorld(bl, side) {
+                // Map buttock line to world Z coordinate
+                let z = bl * 0.5; // Scale factor
+                if (side === 'left') z = -z; // LBL is negative Z
+                return z;
+            }
+            
+            function worldToSta(x) {
+                // Convert world X back to station
+                const normalized = (x + 200) / 400;
+                return STATIONS.MIN + normalized * (STATIONS.MAX - STATIONS.MIN);
+            }
+            
+            function worldToWl(y) {
+                return y / 0.5 + WATERLINES.MIN;
+            }
+            
+            function worldToBl(z) {
+                return Math.abs(z) / 0.5;
+            }
+            
+            function plotCoordinate() {
+                const sta = parseFloat(document.getElementById('station').value);
+                const wl = parseFloat(document.getElementById('waterline').value);
+                const bl = parseFloat(document.getElementById('buttockline').value);
+                const side = document.getElementById('bl-side').value;
+                
+                if (isNaN(sta) || isNaN(wl) || isNaN(bl)) {
+                    alert('Please enter valid coordinates');
+                    return;
+                }
+                
+                // Remove existing marker
+                if (marker) scene.remove(marker);
+                
+                // Create new marker
+                const markerGeometry = new THREE.SphereGeometry(5, 16, 16);
+                const markerMaterial = new THREE.MeshPhongMaterial({
+                    color: 0xff0000,
+                    emissive: 0xff0000,
+                    emissiveIntensity: 0.5
+                });
+                marker = new THREE.Mesh(markerGeometry, markerMaterial);
+                
+                // Position marker
+                marker.position.x = staToWorld(sta);
+                marker.position.y = wlToWorld(wl);
+                marker.position.z = blToWorld(bl, side);
+                
+                scene.add(marker);
+                
+                // Animate marker (pulsing effect)
+                animateMarker();
+            }
+            
+            function animateMarker() {
+                if (!marker) return;
+                
+                let scale = 1;
+                let growing = true;
+                
+                function pulse() {
+                    if (!marker || !marker.parent) return;
+                    
+                    if (growing) {
+                        scale += 0.02;
+                        if (scale >= 1.5) growing = false;
+                    } else {
+                        scale -= 0.02;
+                        if (scale <= 1) growing = true;
+                    }
+                    
+                    marker.scale.set(scale, scale, scale);
+                    requestAnimationFrame(pulse);
+                }
+                
+                pulse();
+            }
+            
+            function updateOpacity(value) {
+                document.getElementById('opacity-value').textContent = value;
+                if (fuselage) {
+                    fuselage.material.opacity = value / 100;
+                }
+            }
+            
+            function toggleWireframe() {
+                if (fuselage) {
+                    fuselage.material.wireframe = !fuselage.material.wireframe;
+                }
+            }
+            
+            function onMouseClick(event) {
+                const rect = renderer.domElement.getBoundingClientRect();
+                mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+                mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+                
+                raycaster.setFromCamera(mouse, camera);
+                const intersects = raycaster.intersectObjects(scene.children, true);
+                
+                if (intersects.length > 0) {
+                    const point = intersects[0].point;
+                    const sta = worldToSta(point.x).toFixed(1);
+                    const wl = worldToWl(point.y).toFixed(1);
+                    const bl = worldToBl(point.z).toFixed(1);
+                    const side = point.z >= 0 ? 'RBL' : 'LBL';
+                    
+                    document.getElementById('click-sta').textContent = sta;
+                    document.getElementById('click-wl').textContent = wl;
+                    document.getElementById('click-bl').textContent = `${bl} (${side})`;
+                    document.getElementById('coordinates-display').classList.add('active');
+                    
+                    setTimeout(() => {
+                        document.getElementById('coordinates-display').classList.remove('active');
+                    }, 5000);
+                }
+            }
+            
+            function onWindowResize() {
+                const container = document.getElementById('viewer');
+                camera.aspect = container.clientWidth / container.clientHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(container.clientWidth, container.clientHeight);
+            }
+            
+            function animate() {
+                requestAnimationFrame(animate);
+                controls.update();
+                renderer.render(scene, camera);
+            }
+            
+            // Initialize on load
+            init();
+        </script>
+    </body>
+    </html>
