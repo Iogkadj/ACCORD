@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Boeing 737 MAX Coordinate Viewer</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            
+            body {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                overflow: hidden;
+                background: #0a0a0a;
+                color: #fff;
+            }
+            
+            #canvas-container {
+                width: 100vw;
+                height: 100vh;
+                position: relative;
+            }
+            
+            #info-panel {
+                position: absolute;
+                top: 20px;
+                left: 20px;
+                background: rgba(0, 0, 0, 0.85);
+                padding: 20px;
+                border-radius: 10px;
+                border: 2px solid #00aaff;
+                max-width: 350px;
+                box-shadow: 0 0 20px rgba(0, 170, 255, 0.3);
+            }
+            
+            h1 {
+                font-size: 22px;
+                margin-bottom: 15px;
+                color: #00aaff;
+                text-align: center;
+            }
+            
+            .input-group {
+                margin-bottom: 15px;
+            }
+            
+            label {
+                display: block;
+                margin-bottom: 5px;
+                font-size: 14px;
+                color: #aaa;
+            }
+            
+            input, select {
+                width: 100%;
+                padding: 8px;
+                border: 1px solid #333;
+                border-radius: 5px;
+                background: #1a1a1a;
+                color: #fff;
+                font-size: 14px;
+            }
+            
+            .bl-input-group {
+                display: flex;
+                gap: 10px;
+            }
+            
+            .bl-input-group select {
+                width: 100px;
+            }
+            
+            .bl-input-group input {
+                flex: 1;
+            }
+            
+            button {
+                width: 100%;
+                padding: 10px;
+                background: #00aaff;
+                border: none;
+                border-radius: 5px;
+                color: white;
+                font-size: 16px;
+                cursor: pointer;
+                margin-top: 10px;
+                transition: background 0.3s;
+            }
+            
+            button:hover {
+                background: #0088cc;
+            }
+            
+            .controls {
+                margin-top: 20px;
+                padding-top: 15px;
+                border-top: 1px solid #333;
+            }
+            
+            .control-row {
+                display: flex;
+                gap: 10px;
+                margin-bottom: 10px;
+            }
+            
+            .control-row button {
+                flex: 1;
+                padding: 8px;
+                font-size: 14px;
+            }
+            
+            #reference-points {
+                margin-top: 15px;
+                padding-top: 15px;
+                border-top: 1px solid #333;
+                font-size: 12px;
+            }
+            
+            .reference-item {
+                margin: 5px 0;
+                color: #888;
+            }
+            
+            #mouse-coords {
+                position: absolute;
+                top: 20px;
+                right: 20px;
+                background: rgba(0, 0, 0, 0.85);
+                padding: 15px;
+                border-radius: 10px;
+                border: 2px solid #00ff00;
+                display: none;
+                box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
+            }
+            
+            #mouse-coords.visible {
+                display: block;
+            }
+            
+            .coord-label {
+                color: #00ff00;
+                font-weight: bold;
+                font-size: 14px;
+            }
+            
+            #loading {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                font-size: 24px;
+                color: #00aaff;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="canvas-container"></div>
+        
+        <div id="info-panel">
+            <h1>Boeing 737 MAX<br>Coordinate Viewer</h1>
+            
+            <div class="input-group">
+                <label>Station (STA)</label>
+                <input type="number" id="sta-input" placeholder="130-1217" value="500">
+            </div>
+            
+            <div class="input-group">
+                <label>Waterline (WL)</label>
+                <input type="number" id="wl-input" placeholder="100-400" value="200">
+            </div>
+            
+            <div class="input-group">
+                <label>Buttock Line</label>
+                <div class="bl-input-group">
+                    <select id="bl-side">
+                        <option value="R">RBL</option>
+                        <option value="L">LBL</option>
+                    </select>
+                    <input type="number" id="bl-input" placeholder="0-100" value="0">
+                </div>
+            </div>
+            
+            <button onclick="plotCoordinate()">Plot Coordinate</button>
+            
+            <div class="controls">
+                <div class="control-row">
+                    <button onclick="toggleTransparency()">Toggle Transparency</button>
+                    <button onclick="toggleWireframe()">Toggle Wireframe</button>
+                </div>
+                <div class="control-row">
+                    <button onclick="clearMarkers()">Clear Markers</button>
+                    <button onclick="resetView()">Reset View</button>
+                </div>
+            </div>
+            
+            <div id="reference-points">
+                <strong>Key Locations:</strong>
+                <div class="reference-item">STA 130 - Nose</div>
+                <div class="reference-item">STA 291.5 - Entry Door</div>
+                <div class="reference-item">STA 323.7-351.2 - Electronics Bay</div>
+                <div class="reference-item">STA 492.4 - Cargo Door</div>
+                <div class="reference-item">STA 700 - Wing Center</div>
+                <div class="reference-item">STA 1217 - Tail</div>
+            </div>
+        </div>
+        
+        <div id="mouse-coords">
+            <div class="coord-label">Hover Coordinates:</div>
+            <div>STA: <span id="hover-sta">-</span></div>
+            <div>WL: <span id="hover-wl">-</span></div>
+            <div>BL: <span id="hover-bl">-</span></div>
+        </div>
+        
+        <div id="loading">Loading 3D Model...</div>
+        
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+        
+        <script>
+            // Scene setup
+            const scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0a0a0a); // Dark background, not blue!
+            
+            const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 10000);
+            camera.position.set(150, 100, 200);
+            
+            const renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+            
+            const controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+            
+            const directionalLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight1.position.set(100, 100, 100);
+            scene.add(directionalLight1);
+            
+            const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.4);
+            directionalLight2.position.set(-100, 50, -100);
+            scene.add(directionalLight2);
+            
+            // Boeing 737 parameters
+            const fuselageLength = 130; // Scaled
+            const fuselageRadius = 7;
+            const noseLength = 15;
+            
+            // Coordinate system
+            // Station (STA): 130 (nose) to 1217 (tail) - longitudinal
+            // Waterline (WL): vertical position
+            // Buttock Line (BL): lateral position (0 = centerline)
+            
+            function staToX(sta) {
+                // Map STA 130-1217 to model space 0 to fuselageLength
+                return ((sta - 130) / (1217 - 130)) * fuselageLength;
+            }
+            
+            function wlToY(wl) {
+                // WL typically 100-400, map to vertical position
+                return (wl - 250) / 10;
+            }
+            
+            function blToZ(bl, side) {
+                // BL 0-100, side determines positive or negative
+                const zValue = bl / 10;
+                return side === 'R' ? zValue : -zValue;
+            }
+            
+            // Create fuselage
+            let fuselageMaterial = new THREE.MeshPhongMaterial({
+                color: 0x999999,
+                transparent: true,
+                opacity: 0.4,
+                side: THREE.DoubleSide
+            });
+            
+            const fuselageGroup = new THREE.Group();
+            
+            // Main cylindrical fuselage
+            const fuselageGeometry = new THREE.CylinderGeometry(
+                fuselageRadius, fuselageRadius, fuselageLength, 32, 1, false
+            );
+            const fuselage = new THREE.Mesh(fuselageGeometry, fuselageMaterial);
+            fuselage.rotation.z = Math.PI / 2;
+            fuselage.position.x = fuselageLength / 2;
+            fuselageGroup.add(fuselage);
+            
+            // Nose cone (pointing FORWARD)
+            const noseGeometry = new THREE.ConeGeometry(fuselageRadius, noseLength, 32);
+            const nose = new THREE.Mesh(noseGeometry, fuselageMaterial);
+            nose.rotation.z = -Math.PI / 2; // Point forward (to the left/negative X)
+            nose.position.x = -noseLength / 2;
+            fuselageGroup.add(nose);
+            
+            // Tail cone
+            const tailGeometry = new THREE.ConeGeometry(fuselageRadius, noseLength, 32);
+            const tail = new THREE.Mesh(tailGeometry, fuselageMaterial);
+            tail.rotation.z = Math.PI / 2; // Point backward
+            tail.position.x = fuselageLength + noseLength / 2;
+            fuselageGroup.add(tail);
+            
+            scene.add(fuselageGroup);
+            
+            // Wings (HORIZONTAL, extending from SIDES)
+            const wingGeometry = new THREE.BoxGeometry(20, 1, 60); // width, height, span
+            const wingMaterial = new THREE.MeshPhongMaterial({ color: 0xcccccc });
+            const wings = new THREE.Mesh(wingGeometry, wingMaterial);
+            wings.position.set(staToX(700), 0, 0); // At wing center STA 700
+            scene.add(wings);
+            
+            // Horizontal stabilizer (tail wings)
+            const hStabGeometry = new THREE.BoxGeometry(8, 0.5, 25);
+            const hStab = new THREE.Mesh(hStabGeometry, wingMaterial);
+            hStab.position.set(staToX(1100), 0, 0);
+            scene.add(hStab);
+            
+            // Vertical stabilizer (tail fin)
+            const vStabGeometry = new THREE.BoxGeometry(10, 15, 1);
+            const vStab = new THREE.Mesh(vStabGeometry, wingMaterial);
+            vStab.position.set(staToX(1100), 7.5, 0);
+            scene.add(vStab);
+            
+            // Forward entry door marker
+            const doorGeometry = new THREE.BoxGeometry(0.5, 3, 2);
+            const doorMaterial = new THREE.MeshBasicMaterial({ color: 0xff6600 });
+            const entryDoor = new THREE.Mesh(doorGeometry, doorMaterial);
+            entryDoor.position.set(staToX(291.5), wlToY(200), -fuselageRadius);
+            scene.add(entryDoor);
+            
+            // Entry door label
+            const createTextSprite = (text, color = '#ffffff') => {
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.width = 256;
+                canvas.height = 64;
+                context.fillStyle = color;
+                context.font = 'Bold 20px Arial';
+                context.fillText(text, 10, 35);
+                const texture = new THREE.CanvasTexture(canvas);
+                const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
+                const sprite = new THREE.Sprite(spriteMaterial);
+                sprite.scale.set(10, 2.5, 1);
+                return sprite;
+            };
+            
+            const doorLabel = createTextSprite('Entry Door', '#ff6600');
+            doorLabel.position.set(staToX(291.5), wlToY(200) + 5, -fuselageRadius);
+            scene.add(doorLabel);
+            
+            // Electronics compartment
+            const elecGeometry = new THREE.BoxGeometry(
+                staToX(351.2) - staToX(323.7), 2, 4
+            );
+            const elecMaterial = new THREE.MeshBasicMaterial({
+                color: 0x0088ff,
+                wireframe: true
+            });
+            const electronics = new THREE.Mesh(elecGeometry, elecMaterial);
+            electronics.position.set(
+                (staToX(323.7) + staToX(351.2)) / 2,
+                -fuselageRadius - 1,
+                0
+            );
+            scene.add(electronics);
+            
+            const elecLabel = createTextSprite('Electronics Bay', '#0088ff');
+            elecLabel.position.set(
+                (staToX(323.7) + staToX(351.2)) / 2,
+                -fuselageRadius - 4,
+                0
+            );
+            scene.add(elecLabel);
+            
+            // Grid helper
+            const gridHelper = new THREE.GridHelper(200, 20, 0x444444, 0x222222);
+            gridHelper.position.y = -15;
+            scene.add(gridHelper);
+            
+            // Axes helper
+            const axesHelper = new THREE.AxesHelper(50);
+            scene.add(axesHelper);
+            
+            // Markers array
+            const markers = [];
+            
+            // Plot coordinate function
+            function plotCoordinate() {
+                const sta = parseFloat(document.getElementById('sta-input').value);
+                const wl = parseFloat(document.getElementById('wl-input').value);
+                const bl = parseFloat(document.getElementById('bl-input').value);
+                const side = document.getElementById('bl-side').value;
+                
+                if (isNaN(sta) || isNaN(wl) || isNaN(bl)) {
+                    alert('Please enter valid numeric coordinates');
+                    return;
+                }
+                
+                const x = staToX(sta);
+                const y = wlToY(wl);
+                const z = blToZ(bl, side);
+                
+                const markerGeometry = new THREE.SphereGeometry(1, 16, 16);
+                const markerMaterial = new THREE.MeshBasicMaterial({
+                    color: 0xff0000,
+                    transparent: true,
+                    opacity: 0.8
+                });
+                const marker = new THREE.Mesh(markerGeometry, markerMaterial);
+                marker.position.set(x, y, z);
+                scene.add(marker);
+                markers.push(marker);
+                
+                console.log(`Plotted: STA ${sta}, WL ${wl}, ${side}BL ${bl} at (${x.toFixed(2)}, ${y.toFixed(2)}, ${z.toFixed(2)})`);
+            }
+            
+            // Clear markers
+            function clearMarkers() {
+                markers.forEach(marker => scene.remove(marker));
+                markers.length = 0;
+            }
+            
+            // Toggle transparency
+            let isTransparent = true;
+            function toggleTransparency() {
+                isTransparent = !isTransparent;
+                fuselageMaterial.opacity = isTransparent ? 0.4 : 1.0;
+            }
+            
+            // Toggle wireframe
+            function toggleWireframe() {
+                fuselageMaterial.wireframe = !fuselageMaterial.wireframe;
+            }
+            
+            // Reset view
+            function resetView() {
+                camera.position.set(150, 100, 200);
+                controls.target.set(fuselageLength / 2, 0, 0);
+                controls.update();
+            }
+            
+            // Mouse coordinate picker
+            const raycaster = new THREE.Raycaster();
+            const mouse = new THREE.Vector2();
+            const mouseCoords = document.getElementById('mouse-coords');
+            
+            renderer.domElement.addEventListener('mousemove', (event) => {
+                mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+                mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+                
+                raycaster.setFromCamera(mouse, camera);
+                const intersects = raycaster.intersectObjects([fuselage, nose, tail, wings, hStab, vStab]);
+                
+                if (intersects.length > 0) {
+                    const point = intersects[0].point;
+                    
+                    // Convert back to Boeing coordinates
+                    const sta = Math.round(130 + (point.x / fuselageLength) * (1217 - 130));
+                    const wl = Math.round(point.y * 10 + 250);
+                    const bl = Math.round(Math.abs(point.z) * 10);
+                    const side = point.z >= 0 ? 'R' : 'L';
+                    
+                    document.getElementById('hover-sta').textContent = sta;
+                    document.getElementById('hover-wl').textContent = wl;
+                    document.getElementById('hover-bl').textContent = `${side}BL ${bl}`;
+                    mouseCoords.classList.add('visible');
+                } else {
+                    mouseCoords.classList.remove('visible');
+                }
+            });
+            
+            // Animation loop
+            function animate() {
+                requestAnimationFrame(animate);
+                controls.update();
+                
+                // Pulsing effect for markers
+                markers.forEach(marker => {
+                    const scale = 1 + 0.3 * Math.sin(Date.now() * 0.005);
+                    marker.scale.set(scale, scale, scale);
+                });
+                
+                renderer.render(scene, camera);
+            }
+            
+            // Window resize
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+            
+            // Hide loading message
+            document.getElementById('loading').style.display = 'none';
+            
+            // Start animation
+            animate();
+        </script>
+    </body>
+    </html>
