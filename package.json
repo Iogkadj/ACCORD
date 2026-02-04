@@ -1,0 +1,23 @@
+{
+  "name": "boeing-737-coordinate-viewer",
+  "version": "1.0.0",
+  "description": "Boeing 737 MAX Coordinate Viewer",
+  "main": "index.js",
+  "scripts": {
+    "android": "cap open android",
+    "build": "cap sync"
+  },
+  "keywords": [
+    "boeing",
+    "737",
+    "coordinates",
+    "3d"
+  ],
+  "author": "SuperCool",
+  "license": "MIT",
+  "dependencies": {
+    "@capacitor/android": "^5.5.1",
+    "@capacitor/core": "^5.5.1",
+    "@capacitor/cli": "^5.5.1"
+  }
+}

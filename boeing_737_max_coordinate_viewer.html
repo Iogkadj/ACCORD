@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Boeing 737 MAX Coordinate Visualizer</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            
+            body {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+                min-height: 100vh;
+                display: flex;
+                padding: 20px;
+            }
+            
+            .container {
+                display: flex;
+                width: 100%;
+                max-width: 1600px;
+                margin: 0 auto;
+                gap: 20px;
+                height: calc(100vh - 40px);
+            }
+            
+            .control-panel {
+                background: white;
+                border-radius: 12px;
+                padding: 30px;
+                box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+                width: 350px;
+                flex-shrink: 0;
+                overflow-y: auto;
+            }
+            
+            .viewer-panel {
+                flex: 1;
+                background: white;
+                border-radius: 12px;
+                padding: 20px;
+                box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+                display: flex;
+                flex-direction: column;
+            }
+            
+            h1 {
+                color: #1e3c72;
+                margin-bottom: 10px;
+                font-size: 24px;
+            }
+            
+            .subtitle {
+                color: #666;
+                margin-bottom: 25px;
+                font-size: 14px;
+            }
+            
+            .input-group {
+                margin-bottom: 20px;
+            }
+            
+            label {
+                display: block;
+                color: #333;
+                font-weight: 600;
+                margin-bottom: 8px;
+                font-size: 14px;
+            }
+            
+            .label-desc {
+                font-size: 12px;
+                color: #666;
+                font-weight: normal;
+                margin-left: 5px;
+            }
+            
+            input[type="number"] {
+                width: 100%;
+                padding: 12px;
+                border: 2px solid #e0e0e0;
+                border-radius: 6px;
+                font-size: 16px;
+                transition: border-color 0.3s;
+            }
+            
+            input[type="number"]:focus {
+                outline: none;
+                border-color: #2a5298;
+            }
+            
+            .btn {
+                width: 100%;
+                padding: 14px;
+                background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+                color: white;
+                border: none;
+                border-radius: 6px;
+                font-size: 16px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: transform 0.2s, box-shadow 0.2s;
+                margin-top: 10px;
+            }
+            
+            .btn:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 5px 20px rgba(30, 60, 114, 0.4);
+            }
+            
+            .btn:active {
+                transform: translateY(0);
+            }
+            
+            .info-box {
+                background: #f5f7fa;
+                border-left: 4px solid #2a5298;
+                padding: 15px;
+                border-radius: 6px;
+                margin-top: 25px;
+                font-size: 13px;
+                color: #555;
+                line-height: 1.6;
+            }
+            
+            .info-box strong {
+                color: #1e3c72;
+                display: block;
+                margin-bottom: 8px;
+            }
+            
+            .coordinates-display {
+                background: #e8f4f8;
+                border-radius: 6px;
+                padding: 15px;
+                margin-top: 20px;
+            }
+            
+            .coordinates-display h3 {
+                color: #1e3c72;
+                font-size: 14px;
+                margin-bottom: 10px;
+            }
+            
+            .coord-item {
+                display: flex;
+                justify-content: space-between;
+                padding: 5px 0;
+                font-size: 13px;
+            }
+            
+            .coord-label {
+                font-weight: 600;
+                color: #333;
+            }
+            
+            .coord-value {
+                color: #2a5298;
+                font-family: monospace;
+            }
+            
+            #canvas {
+                flex: 1;
+                border-radius: 8px;
+                background: #f0f4f8;
+            }
+            
+            .view-controls {
+                display: flex;
+                gap: 10px;
+                margin-top: 15px;
+                flex-wrap: wrap;
+            }
+            
+            .view-btn {
+                flex: 1;
+                min-width: 100px;
+                padding: 10px;
+                background: #f0f4f8;
+                border: 2px solid #2a5298;
+                color: #1e3c72;
+                border-radius: 6px;
+                font-size: 13px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.2s;
+            }
+            
+            .view-btn:hover {
+                background: #2a5298;
+                color: white;
+            }
+            
+            .view-btn.active {
+                background: #1e3c72;
+                color: white;
+            }
+            
+            .aircraft-selector {
+                margin-bottom: 25px;
+            }
+            
+            select {
+                width: 100%;
+                padding: 12px;
+                border: 2px solid #e0e0e0;
+                border-radius: 6px;
+                font-size: 14px;
+                background: white;
+                cursor: pointer;
+            }
+            
+            select:focus {
+                outline: none;
+                border-color: #2a5298;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="control-panel">
+                <h1>Boeing 737 MAX</h1>
+                <p class="subtitle">Coordinate Visualizer</p>
+                
+                <div class="aircraft-selector">
+                    <label>Aircraft Model</label>
+                    <select id="aircraftModel">
+                        <option value="737-8">Boeing 737-8 MAX</option>
+                        <option value="737-9">Boeing 737-9 MAX</option>
+                    </select>
+                </div>
+                
+                <div class="input-group">
+                    <label>STA <span class="label-desc">(Station - Fuselage Station)</span></label>
+                    <input type="number" id="sta" value="500" step="10" min="0" max="1500" placeholder="e.g., 500">
+                </div>
+                
+                <div class="input-group">
+                    <label>WL <span class="label-desc">(Waterline - Height)</span></label>
+                    <input type="number" id="wl" value="100" step="5" min="-100" max="300" placeholder="e.g., 100">
+                </div>
+                
+                <div class="input-group">
+                    <label>BL <span class="label-desc">(Buttock Line - Lateral)</span></label>
+                    <input type="number" id="bl" value="0" step="5" min="-100" max="100" placeholder="e.g., 0">
+                </div>
+                
+                <button class="btn" onclick="plotPoint()">Plot Coordinate</button>
+                <button class="btn" style="background: linear-gradient(135deg, #666 0%, #888 100%);" onclick="resetView()">Reset View</button>
+                
+                <div class="coordinates-display" id="coordDisplay" style="display: none;">
+                    <h3>Current Point</h3>
+                    <div class="coord-item">
+                        <span class="coord-label">Station (STA):</span>
+                        <span class="coord-value" id="displaySta">-</span>
+                    </div>
+                    <div class="coord-item">
+                        <span class="coord-label">Waterline (WL):</span>
+                        <span class="coord-value" id="displayWl">-</span>
+                    </div>
+                    <div class="coord-item">
+                        <span class="coord-label">Buttock Line (BL):</span>
+                        <span class="coord-value" id="displayBl">-</span>
+                    </div>
+                </div>
+                
+                <div class="info-box">
+                    <strong>Coordinate System:</strong>
+                    <strong>STA (Station):</strong> Longitudinal position along fuselage (0 at nose)<br>
+                    <strong>WL (Waterline):</strong> Vertical position (height above reference)<br>
+                    <strong>BL (Buttock Line):</strong> Lateral position (0 at centerline, + is right)
+                </div>
+                
+                <div class="info-box" style="margin-top: 15px;">
+                    <strong>Boeing 737-8 MAX:</strong>
+                    Length: 129.5 ft (39.5m)<br>
+                    <strong>Boeing 737-9 MAX:</strong>
+                    Length: 138.3 ft (42.2m)
+                </div>
+            </div>
+            
+            <div class="viewer-panel">
+                <canvas id="canvas"></canvas>
+                <div class="view-controls">
+                    <button class="view-btn" onclick="setView('perspective')">Perspective</button>
+                    <button class="view-btn" onclick="setView('side')">Side View</button>
+                    <button class="view-btn" onclick="setView('top')">Top View</button>
+                    <button class="view-btn" onclick="setView('front')">Front View</button>
+                </div>
+            </div>
+        </div>
+    
+        <script>
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            let rotation = { x: 20, y: 30 };
+            let isDragging = false;
+            let lastMouse = { x: 0, y: 0 };
+            let currentPoint = null;
+            let currentAircraft = '737-8';
+            
+            // Aircraft dimensions (in inches, typical Boeing coordinate system)
+            const aircraftData = {
+                '737-8': {
+                    length: 1545, // STA range
+                    diameter: 148,
+                    name: 'Boeing 737-8 MAX'
+                },
+                '737-9': {
+                    length: 1659, // STA range
+                    diameter: 148,
+                    name: 'Boeing 737-9 MAX'
+                }
+            };
+            
+            function resizeCanvas() {
+                canvas.width = canvas.offsetWidth;
+                canvas.height = canvas.offsetHeight;
+                draw();
+            }
+            
+            window.addEventListener('resize', resizeCanvas);
+            resizeCanvas();
+            
+            // Mouse controls for rotation
+            canvas.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                lastMouse = { x: e.clientX, y: e.clientY };
+            });
+            
+            canvas.addEventListener('mousemove', (e) => {
+                if (isDragging) {
+                    const dx = e.clientX - lastMouse.x;
+                    const dy = e.clientY - lastMouse.y;
+                    rotation.y += dx * 0.5;
+                    rotation.x += dy * 0.5;
+                    lastMouse = { x: e.clientX, y: e.clientY };
+                    draw();
+                }
+            });
+            
+            canvas.addEventListener('mouseup', () => {
+                isDragging = false;
+            });
+            
+            canvas.addEventListener('mouseleave', () => {
+                isDragging = false;
+            });
+            
+            // Touch controls
+            let lastTouch = null;
+            canvas.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                lastTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            });
+            
+            canvas.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                if (lastTouch) {
+                    const dx = e.touches[0].clientX - lastTouch.x;
+                    const dy = e.touches[0].clientY - lastTouch.y;
+                    rotation.y += dx * 0.5;
+                    rotation.x += dy * 0.5;
+                    lastTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                    draw();
+                }
+            });
+            
+            canvas.addEventListener('touchend', () => {
+                lastTouch = null;
+            });
+            
+            function project3D(x, y, z) {
+                const scale = 0.8;
+                const cx = canvas.width / 2;
+                const cy = canvas.height / 2;
+                
+                // Rotation matrices
+                const rx = rotation.x * Math.PI / 180;
+                const ry = rotation.y * Math.PI / 180;
+                
+                // Rotate around X axis
+                let y1 = y * Math.cos(rx) - z * Math.sin(rx);
+                let z1 = y * Math.sin(rx) + z * Math.cos(rx);
+                
+                // Rotate around Y axis
+                let x2 = x * Math.cos(ry) + z1 * Math.sin(ry);
+                let z2 = -x * Math.sin(ry) + z1 * Math.cos(ry);
+                
+                // Perspective projection
+                const perspective = 1000;
+                const depth = perspective / (perspective + z2);
+                
+                return {
+                    x: cx + x2 * depth * scale,
+                    y: cy - y1 * depth * scale,
+                    z: z2
+                };
+            }
+            
+            function drawFuselage() {
+                const aircraft = aircraftData[currentAircraft];
+                const length = aircraft.length;
+                const radius = aircraft.diameter / 2;
+                const segments = 30;
+                const rings = 20;
+                
+                ctx.strokeStyle = 'rgba(100, 120, 180, 0.6)';
+                ctx.lineWidth = 1.5;
+                
+                // Draw fuselage outline
+                for (let i = 0; i <= rings; i++) {
+                    const x = (i / rings) * length - length / 2;
+                    const points = [];
+                    
+                    for (let j = 0; j <= segments; j++) {
+                        const angle = (j / segments) * Math.PI * 2;
+                        const y = Math.sin(angle) * radius;
+                        const z = Math.cos(angle) * radius;
+                        points.push(project3D(x, y, z));
+                    }
+                    
+                    ctx.beginPath();
+                    for (let j = 0; j < points.length; j++) {
+                        if (j === 0) ctx.moveTo(points[j].x, points[j].y);
+                        else ctx.lineTo(points[j].x, points[j].y);
+                    }
+                    ctx.stroke();
+                }
+                
+                // Draw longitudinal lines
+                for (let j = 0; j < segments; j += 3) {
+                    const angle = (j / segments) * Math.PI * 2;
+                    ctx.beginPath();
+                    
+                    for (let i = 0; i <= rings; i++) {
+                        const x = (i / rings) * length - length / 2;
+                        const y = Math.sin(angle) * radius;
+                        const z = Math.cos(angle) * radius;
+                        const p = project3D(x, y, z);
+                        
+                        if (i === 0) ctx.moveTo(p.x, p.y);
+                        else ctx.lineTo(p.x, p.y);
+                    }
+                    ctx.stroke();
+                }
+                
+                // Draw nose cone
+                ctx.strokeStyle = 'rgba(80, 100, 160, 0.8)';
+                ctx.lineWidth = 2;
+                const noseSegments = 10;
+                
+                for (let j = 0; j <= segments; j += 2) {
+                    const angle = (j / segments) * Math.PI * 2;
+                    ctx.beginPath();
+                    
+                    for (let i = 0; i <= noseSegments; i++) {
+                        const t = i / noseSegments;
+                        const x = -length / 2 - (1 - t * t) * radius * 1.5;
+                        const r = t * radius;
+                        const y = Math.sin(angle) * r;
+                        const z = Math.cos(angle) * r;
+                        const p = project3D(x, y, z);
+                        
+                        if (i === 0) ctx.moveTo(p.x, p.y);
+                        else ctx.lineTo(p.x, p.y);
+                    }
+                    ctx.stroke();
+                }
+            }
+            
+            function drawAxes() {
+                const aircraft = aircraftData[currentAircraft];
+                const length = aircraft.length;
+                
+                // X axis (Station) - Red
+                ctx.strokeStyle = 'rgba(255, 0, 0, 0.5)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                let p1 = project3D(-length/2 - 100, 0, 0);
+                let p2 = project3D(length/2 + 100, 0, 0);
+                ctx.moveTo(p1.x, p1.y);
+                ctx.lineTo(p2.x, p2.y);
+                ctx.stroke();
+                
+                // Y axis (Waterline) - Green
+                ctx.strokeStyle = 'rgba(0, 255, 0, 0.5)';
+                ctx.beginPath();
+                p1 = project3D(0, -150, 0);
+                p2 = project3D(0, 250, 0);
+                ctx.moveTo(p1.x, p1.y);
+                ctx.lineTo(p2.x, p2.y);
+                ctx.stroke();
+                
+                // Z axis (Buttock Line) - Blue
+                ctx.strokeStyle = 'rgba(0, 0, 255, 0.5)';
+                ctx.beginPath();
+                p1 = project3D(0, 0, -150);
+                p2 = project3D(0, 0, 150);
+                ctx.moveTo(p1.x, p1.y);
+                ctx.lineTo(p2.x, p2.y);
+                ctx.stroke();
+                
+                // Axis labels
+                ctx.fillStyle = '#333';
+                ctx.font = 'bold 14px Arial';
+                p1 = project3D(length/2 + 120, 0, 0);
+                ctx.fillText('STA', p1.x, p1.y);
+                p1 = project3D(0, 270, 0);
+                ctx.fillText('WL', p1.x, p1.y);
+                p1 = project3D(0, 0, 170);
+                ctx.fillText('BL', p1.x, p1.y);
+            }
+            
+            function drawPoint(sta, wl, bl) {
+                const aircraft = aircraftData[currentAircraft];
+                const length = aircraft.length;
+                
+                // Convert coordinates (STA is longitudinal, offset from center)
+                const x = sta - length / 2;
+                const y = wl;
+                const z = bl;
+                
+                const p = project3D(x, y, z);
+                
+                // Draw point with glow effect
+                const gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 15);
+                gradient.addColorStop(0, 'rgba(255, 50, 50, 1)');
+                gradient.addColorStop(0.5, 'rgba(255, 100, 100, 0.8)');
+                gradient.addColorStop(1, 'rgba(255, 50, 50, 0)');
+                
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 15, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Draw solid center
+                ctx.fillStyle = '#ff0000';
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Draw reference lines to axes
+                ctx.strokeStyle = 'rgba(255, 0, 0, 0.3)';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([5, 5]);
+                
+                // Line to XY plane (floor)
+                ctx.beginPath();
+                let p2 = project3D(x, 0, z);
+                ctx.moveTo(p.x, p.y);
+                ctx.lineTo(p2.x, p2.y);
+                ctx.stroke();
+                
+                // Line to XZ plane (side)
+                ctx.beginPath();
+                p2 = project3D(x, y, 0);
+                ctx.moveTo(p.x, p.y);
+                ctx.lineTo(p2.x, p2.y);
+                ctx.stroke();
+                
+                ctx.setLineDash([]);
+                
+                // Draw coordinate label
+                ctx.fillStyle = '#000';
+                ctx.font = 'bold 12px Arial';
+                ctx.fillText(`(${sta}, ${wl}, ${bl})`, p.x + 20, p.y - 10);
+            }
+            
+            function draw() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                drawAxes();
+                drawFuselage();
+                
+                if (currentPoint) {
+                    drawPoint(currentPoint.sta, currentPoint.wl, currentPoint.bl);
+                }
+                
+                // Draw title
+                ctx.fillStyle = '#1e3c72';
+                ctx.font = 'bold 16px Arial';
+                ctx.fillText(aircraftData[currentAircraft].name, 20, 30);
+                
+                // Draw instructions
+                ctx.fillStyle = '#666';
+                ctx.font = '12px Arial';
+                ctx.fillText('Click and drag to rotate', 20, canvas.height - 20);
+            }
+            
+            function plotPoint() {
+                const sta = parseFloat(document.getElementById('sta').value);
+                const wl = parseFloat(document.getElementById('wl').value);
+                const bl = parseFloat(document.getElementById('bl').value);
+                
+                currentPoint = { sta, wl, bl };
+                
+                // Update display
+                document.getElementById('coordDisplay').style.display = 'block';
+                document.getElementById('displaySta').textContent = sta;
+                document.getElementById('displayWl').textContent = wl;
+                document.getElementById('displayBl').textContent = bl;
+                
+                draw();
+            }
+            
+            function resetView() {
+                rotation = { x: 20, y: 30 };
+                draw();
+            }
+            
+            function setView(view) {
+                switch(view) {
+                    case 'perspective':
+                        rotation = { x: 20, y: 30 };
+                        break;
+                    case 'side':
+                        rotation = { x: 0, y: 0 };
+                        break;
+                    case 'top':
+                        rotation = { x: 90, y: 0 };
+                        break;
+                    case 'front':
+                        rotation = { x: 0, y: 90 };
+                        break;
+                }
+                draw();
+            }
+            
+            document.getElementById('aircraftModel').addEventListener('change', (e) => {
+                currentAircraft = e.target.value;
+                draw();
+            });
+            
+            // Initialize
+            draw();
+        </script>
+    </body>
+    </html>
+    

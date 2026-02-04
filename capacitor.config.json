@@ -1,0 +1,9 @@
+{
+  "appId": "com.supercool.boeing737viewer",
+  "appName": "Boeing 737 Viewer",
+  "webDir": "www",
+  "bundledWebRuntime": false,
+  "android": {
+    "allowMixedContent": true
+  }
+}
